@@ -1,13 +1,29 @@
 
 """
-    python program to read json file
+    python server program to read json file and create file system 
 """
 
 import os, json, glob
 
 #defining classes
-        
-        
+
+class options:
+    """struct like class
+
+    Returns:
+        _type_: _description_
+    """    
+    #locate the data folder
+    def get_rel_path():
+        return os.path.join('..', 'data')
+
+    #grab files in folder
+    def get_json_file_paths(rel_path):
+        return glob.glob(os.path.join(rel_path, '*.json'))
+    
+    #grab file names in folder
+    def get_json_file_names(rel_path):
+        return list(map(lambda x: x.replace('.json', ''), os.listdir(rel_path)))
         
 class TableMap(object):
     """table relational map
@@ -49,13 +65,13 @@ class TableMap(object):
                 os.makedirs(path, exist_ok = True)
                 setattr(self, key, Table(value, path))
                 
-            if isinstance(value, dict):
+            elif isinstance(value, dict):
                 path = os.path.join(self.parent_path, str(key))
                 os.makedirs(path, exist_ok = True)
                 setattr(self, key, TableMap(value, path))
 
-            if isinstance(value, str):
-                line = str(key) + ',' + value + '\n'
+            else:
+                line = str(key) + ',' + str(value) + '\n'
                 csv_lines.append(line)
         csv_path = os.path.join(self.parent_path, 'tabular_info.csv')
         __write_csv(csv_path, csv_lines)
@@ -71,17 +87,16 @@ class JsonRec(TableMap):
         that use data from json files
     """    
     def __init__(self, json_path: str, parent_path: str, folder_name: str):
-        self._json_path = json_path
-        self.__load_json_data()#load data from json file to python dict
+        self.__load_json_data(json_path)#load data from json file to python dict
         path = os.path.join(parent_path, folder_name)
         os.makedirs(path, exist_ok = True)      
         TableMap.__init__(self, self._raw_data, path)
         
         
-    def __load_json_data(self):
+    def __load_json_data(self, json_path):
         """convert json data to python dictionaries
         """        
-        with open(self._json_path ,'r') as f:
+        with open(json_path ,'r') as f:
             data = json.loads(f.read())
         self._raw_data = data
 
@@ -108,10 +123,10 @@ class Table(object):
             os.makedirs(path, exist_ok = True)
             if isinstance(row, dict):                
                 setattr(self, 'record_' + str(num), TableMap(row, path))               
-            elif isinstance(row, str):
+            else:
                 csv_path = os.path.join(path, 'string_info.csv')
                 with open(csv_path, 'w') as f:
-                    f.write(row)
+                    f.write(str(row))
               
         for num in range(len(self._dict_list)):
             __line_converter(num)
@@ -134,6 +149,7 @@ if __name__ == '__main__':
     __json_file_names = list(map(lambda x: x.replace('.json', ''), os.listdir(rel_path)))
     #testing
     #pilot = JsonRec(__json_file_paths[0], '..', __json_file_names[0].replace('.json', ''))
+    
     for index in range(len(__json_file_paths)):
         JsonRec(__json_file_paths[index], '..', __json_file_names[index])
     
