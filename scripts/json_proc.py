@@ -3,8 +3,7 @@
     python program to read json file
 """
 
-import os, json, glob, psycopg2
-import pandas as pd
+import os, json, glob
 
 #defining classes
         
@@ -14,10 +13,10 @@ class TableMap(object):
     """table relational map
     """    
     def __init__ (self, table_map: dict, parent_path):
+        self.parent_path = parent_path
         self._table_map = table_map
         self.__set_attributes(table_map)
-        self.__converter()
-        self.__create_folder(parent_path)
+        self.__create_dirs()
     
     def __set_attributes(self, record_table: dict):
         for name, value in record_table.items():
@@ -33,26 +32,35 @@ class TableMap(object):
 
         return self._table_map[key]       
     
-    def __converter(self):
+    def __create_dirs(self):
         """convert list of dicts to table objects
         """        
-        self.dir = False
+        def __write_csv(path, csv_lines):
+            """write the string info into a csv
+            """        
+            with open(path, 'w') as f:
+                for line in csv_lines:
+                    f.write(line)
+        csv_lines = []#gather string info to a csv
         for key in self._keys:
             value = self._table_map[key]
             if isinstance(value, list):
-                setattr(self, key, Table(value))
-                self.dir = True
-            if isinstance(value, dict):
-                setattr(self, key, TableMap(value))
-                self.dir = True
+                path = os.path.join(self.parent_path, str(key))
+                os.makedirs(path, exist_ok = True)
+                setattr(self, key, Table(value, path))
                 
-    def __create_folder(self, parent_path):
+            if isinstance(value, dict):
+                path = os.path.join(self.parent_path, str(key))
+                os.makedirs(path, exist_ok = True)
+                setattr(self, key, TableMap(value, path))
+
+            if isinstance(value, str):
+                line = str(key) + ',' + value + '\n'
+                csv_lines.append(line)
+        csv_path = os.path.join(self.parent_path, 'tabular_info.csv')
+        __write_csv(csv_path, csv_lines)
         
-        if self.dir:
-            for folder_name in self._keys:
-                path = os.path.join(parent_path, folder_name)
-                self.curr_path = path
-                os.mkdir(path)         
+                  
             
             
 
@@ -62,10 +70,12 @@ class JsonRec(TableMap):
     """class definition of json record objects 
         that use data from json files
     """    
-    def __init__(self, json_path: str):
+    def __init__(self, json_path: str, parent_path: str, folder_name: str):
         self._json_path = json_path
         self.__load_json_data()#load data from json file to python dict
-        TableMap.__init__(self, self._raw_data)
+        path = os.path.join(parent_path, folder_name)
+        os.makedirs(path, exist_ok = True)      
+        TableMap.__init__(self, self._raw_data, path)
         
         
     def __load_json_data(self):
@@ -82,35 +92,31 @@ class Table(object):
 
     """    
     def __init__(self, dict_list: list, parent_path):
+        self.parent_path = parent_path
         self.__set_attributes(dict_list)
-        self.__converter()
-        self.__create_folder(parent_path)
+        self.__create_dirs()
     
     def __set_attributes(self, dict_list: 'list[dict]'):
         self._dict_list = dict_list
         
-    def __converter(self):
-        def __line_converter(row):
-            if isinstance(row, dict):
-                for key in row:
-                    value = row[key]
-                    if isinstance(value, dict):
-                        self.dir = True
-                        row[key] = TableMap(value)
-                    if isinstance(value, list):
-                        self.dir = True
-                        row[key] = Table(value)
-        self.dir = False
-        for row in self._dict_list:
-            __line_converter(row)
+    def __create_dirs(self):
+    
+                    
+        def __line_converter(num):
+            row = self._dict_list[num]
+            path = os.path.join(self.parent_path, 'record_' + str(num))
+            os.makedirs(path, exist_ok = True)
+            if isinstance(row, dict):                
+                setattr(self, 'record_' + str(num), TableMap(row, path))               
+            elif isinstance(row, str):
+                csv_path = os.path.join(path, 'string_info.csv')
+                with open(csv_path, 'w') as f:
+                    f.write(row)
+              
+        for num in range(len(self._dict_list)):
+            __line_converter(num)
 
-    def __create_folder(self, parent_path):
-            
-        if self.dir:
-            for num in range(len(self._dict_list)):
-                path = os.path.join(parent_path, 'record_' + str(num))
-                self.curr_path = path
-                os.mkdir(path)
+        
             
             
     
@@ -125,9 +131,11 @@ if __name__ == '__main__':
 
     #grab files in folder
     __json_file_paths = glob.glob(os.path.join(rel_path, '*.json'))
-    
+    __json_file_names = list(map(lambda x: x.replace('.json', ''), os.listdir(rel_path)))
     #testing
-    pilot = JsonRec(__json_file_paths[0])
+    #pilot = JsonRec(__json_file_paths[0], '..', __json_file_names[0].replace('.json', ''))
+    for index in range(len(__json_file_paths)):
+        JsonRec(__json_file_paths[index], '..', __json_file_names[index])
     
     print()
             
